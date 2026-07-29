@@ -57,12 +57,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            activities
             assets
             GPX_OUT
-            TCX_OUT
-            FIT_OUT
-            Workouts
             backend/data.db
             src/static/activities.json
             imported.json

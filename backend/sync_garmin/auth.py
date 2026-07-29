@@ -12,8 +12,6 @@ from garminconnect import Garmin
 # file_type -> 库下载枚举
 DOWNLOAD_FORMATS = {
     "gpx": Garmin.ActivityDownloadFormat.GPX,
-    "tcx": Garmin.ActivityDownloadFormat.TCX,
-    "fit": Garmin.ActivityDownloadFormat.ORIGINAL,  # ORIGINAL 返回 fit 的 zip
 }
 
 
@@ -56,13 +54,9 @@ class GarminClient:
         return self._client.get_activity(activity_id)
 
     def download(self, activity_id, file_type):
-        """下载活动为指定格式,返回 bytes。fit 返回 zip 需上层解压。"""
+        """下载活动为指定格式,返回 bytes。"""
         dl_fmt = DOWNLOAD_FORMATS[file_type]
         return self._client.download_activity(activity_id, dl_fmt=dl_fmt)
-
-    def upload(self, file_path):
-        """上传活动文件(cn_to_global 用)。"""
-        return self._client.upload_activity(file_path)
 
     @property
     def raw(self):

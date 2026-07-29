@@ -21,6 +21,7 @@ _site/
 config.yaml
 .venv/
 .pdm-python
+.pdm-build/
 
 route.png
 route.svg

@@ -30,7 +30,7 @@ jobs:
       - name: Backend import smoke test
         run: |
           # 确认 backend 佳明同步链路可导入(独立闭环)
-          python -c "from backend.sync_garmin import sync, cn_to_global, make_secret"
+          python -c "from backend.sync_garmin import sync, make_secret"
           python -m backend.sync_garmin.sync --help
 
       - name: Check formatting (black)

@@ -1,17 +1,14 @@
-"""佳明活动下载层 — 列活动、并发下载、FIT 解压、gpx summary 注入。
+"""佳明活动下载层 — 列活动、并发下载 GPX、summary 注入。
 
 相比旧 garmin_sync.py 的修复:
   - 列活动: 递归分页 → while 迭代(不再有爆栈风险)
   - 下载失败: except:continue 静默吞 → 记录 id+原因, 结尾汇总
-  - FIT 解压: 依赖 {id}_ACTIVITY.fit 命名 → 按 zip 内实际 .fit 内容定位
   - 并发: 新库同步调用, 用线程池替代旧 asyncio.gather
 """
 
 import concurrent.futures
 import datetime as dt
 import os
-import zipfile
-from io import BytesIO
 
 from lxml import etree
 
@@ -90,26 +87,10 @@ def _inject_gpx_summary(gpx_bytes, summary_infos):
     return gpx_bytes
 
 
-def _save_fit(zip_bytes, activity_id, folder):
-    """fit 端点返回 zip, 解压出真正的 .fit。按内容定位, 不依赖 _ACTIVITY.fit 命名。"""
-    with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
-        fit_names = [n for n in zf.namelist() if n.lower().endswith(".fit")]
-        if not fit_names:
-            raise ValueError(f"zip 内无 .fit 文件: {zf.namelist()}")
-        target = os.path.join(folder, f"{activity_id}.fit")
-        with zf.open(fit_names[0]) as src, open(target, "wb") as dst:
-            dst.write(src.read())
-    return target
-
-
 def _download_one(client, activity_id, file_type, folder, summary_infos_map):
-    """下载单条活动并写盘。异常向上抛(由调用方带 id 记录)。"""
+    """下载单条活动 GPX 并写盘。异常向上抛(由调用方带 id 记录)。"""
     data = client.download(activity_id, file_type)
-    if file_type == "fit":
-        _save_fit(data, activity_id, folder)
-        return
-    if file_type == "gpx":
-        data = _inject_gpx_summary(data, summary_infos_map.get(activity_id))
+    data = _inject_gpx_summary(data, summary_infos_map.get(activity_id))
     file_path = os.path.join(folder, f"{activity_id}.{file_type}")
     with open(file_path, "wb") as fb:
         fb.write(data)

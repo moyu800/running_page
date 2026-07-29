@@ -58,8 +58,6 @@ jobs:
           path: |
             assets
             GPX_OUT
-            TCX_OUT
-            FIT_OUT
             backend/data.db
             src/static/activities.json
             imported.json

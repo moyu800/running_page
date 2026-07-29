@@ -6,12 +6,8 @@ parent = os.path.dirname(current)  # 项目根
 
 # 下载落盘目录(运行时按需 makedirs)
 GPX_FOLDER = os.path.join(parent, "GPX_OUT")
-TCX_FOLDER = os.path.join(parent, "TCX_OUT")
-FIT_FOLDER = os.path.join(parent, "FIT_OUT")
 FOLDER_DICT = {
     "gpx": GPX_FOLDER,
-    "tcx": TCX_FOLDER,
-    "fit": FIT_FOLDER,
 }
 
 # 数据库随 backend 走(data.db 在 backend/ 内)
