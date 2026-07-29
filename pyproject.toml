@@ -38,6 +38,7 @@ dependencies = [
   "svglib>=1.5.1",
   "cairosvg>=2.7.1",
   "certifi==2025.1.31",
+  "garminconnect>=0.3.7",
 ]
 requires-python = ">=3.12"
 readme = "README.md"
@@ -50,3 +51,19 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
+
+[tool.ruff.lint]
+# 忽略风格洁癖类规则(无一真 bug): 宽异常捕获是有意的容错设计,
+# ={} 默认参数不 mutate, naive datetime 是项目既有的本地时间约定。
+ignore = [
+    "BLE001", # 允许 except Exception(异常记录/容错)
+    "B006",   # 允许可变默认参数(不 mutate)
+    "DTZ007", # 允许 naive strptime(本地时间约定)
+    "S110",   # 允许 try-except-pass(反查容错)
+    "SIM401", # 允许 if/else 取值(可读性偏好)
+    "RUF046", # int() 包装
+    "TRY002", # 允许 raise Exception
+    "PLW1508", # getenv 默认值类型
+    "C408",   # 允许 dict() 调用
+    "FURB162", # 时区替换写法
+]

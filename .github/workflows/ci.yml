@@ -27,10 +27,11 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
 
-      - name: Run GPX sync test
+      - name: Backend import smoke test
         run: |
-          # make sure the gpx_sync.py script is executable
-          python run_page/gpx_sync.py
+          # 确认 backend 佳明同步链路可导入(独立闭环)
+          python -c "from backend.sync_garmin import sync, make_secret"
+          python -m backend.sync_garmin.sync --help
 
       - name: Check formatting (black)
         run: black . --diff --color && black . --check

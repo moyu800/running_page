@@ -1,33 +1,16 @@
-httpx
+garminconnect
 gpxpy==1.6.2
-stravalib==0.10.4
-appdirs>=1.4.0
-svgwrite>=1.1.9
-colour>=0.1.5
-s2sphere
-arrow
-geopy
 polyline
 sqlalchemy
-tzfpy; platform_system != "Windows"
-timezonefinder; platform_system == "Windows"
-pyyaml
-aiofiles
-cloudscraper==1.2.71
-tcxreader
-rich
+geopy
 lxml
-eviltransform
-stravaweblib
-tenacity
-numpy
-tzlocal
+rich
+tcxreader
 fit-tool
 garmin-fit-sdk
+s2sphere
+colour>=0.1.5
 haversine==2.8.0
-garth
-pycryptodome
-duckdb
-openai==1.88.0
-# cairosvg
-certifi==2025.1.31
+pytz
+tzfpy; platform_system != "Windows"
+timezonefinder; platform_system == "Windows"
