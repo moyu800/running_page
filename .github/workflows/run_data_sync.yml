@@ -67,9 +67,12 @@ jobs:
             ${{ env.DATA_CACHE_PREFIX }}-
 
       # Garmin 中国区同步。生成 secret: python -m backend.sync_garmin.make_secret <email> <password> --is-cn
+      # secret 是 JSON 串,必须走 env 注入并加引号,否则会被 shell 按空格/花括号拆断
       - name: Run sync Garmin CN script
+        env:
+          GARMIN_SECRET_STRING_CN: ${{ secrets.GARMIN_SECRET_STRING_CN }}
         run: |
-          python -m backend.sync_garmin.sync ${{ secrets.GARMIN_SECRET_STRING_CN }} --is-cn
+          python -m backend.sync_garmin.sync "$GARMIN_SECRET_STRING_CN" --is-cn
 
       - name: Push new runs
         if: env.SAVE_DATA_IN_GITHUB_CACHE != 'true'
