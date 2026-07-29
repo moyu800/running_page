@@ -38,6 +38,7 @@ dependencies = [
   "svglib>=1.5.1",
   "cairosvg>=2.7.1",
   "certifi==2025.1.31",
+  "garminconnect>=0.3.7",
 ]
 requires-python = ">=3.12"
 readme = "README.md"
