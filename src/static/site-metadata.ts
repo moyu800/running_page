@@ -11,13 +11,13 @@ interface ISiteMetadataResult {
 
 const getBasePath = () => {
   const baseUrl = import.meta.env.BASE_URL;
-  return baseUrl === '/' ? '' : baseUrl;
+  return baseUrl === '/' ? '' : baseUrl.replace(/\/$/, '');
 };
 
 const data: ISiteMetadataResult = {
   siteTitle: 'Running Page',
-  siteUrl: 'https://yihong.run',
-  logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQTtc69JxHNcmN1ETpMUX4dozAgAN6iPjWalQ&usqp=CAU',
+  siteUrl: `${getBasePath()}/`,
+  logo: '',
   description: 'Personal site and blog',
   navLinks: [
     {
