@@ -54,13 +54,15 @@ const Header = () => {
   return (
     <>
       <nav className="mx-auto mt-12 flex w-full max-w-screen-2xl min-w-max items-center justify-between pl-6 lg:px-16">
-        <div className="w-1/4">
-          <Link to={siteUrl}>
-            <picture>
-              <img className="h-16 w-16 rounded-full" alt="logo" src={logo} />
-            </picture>
-          </Link>
-        </div>
+        {logo && (
+          <div className="w-1/4">
+            <Link to={siteUrl}>
+              <picture>
+                <img className="h-16 w-16 rounded-full" alt="logo" src={logo} />
+              </picture>
+            </Link>
+          </div>
+        )}
         <div className="flex w-3/4 items-center justify-end text-right">
           {navLinks.map((n) => (
             <a
