@@ -101,6 +101,45 @@ export function RouteMapCanvas({
     return bounds;
   }, [routes]);
 
+  const plainPaths = useMemo(() => {
+    if (MAPBOX_TOKEN || !routes.length) return [];
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    for (const route of routes) {
+      for (const [lng, lat] of route.geometry.coordinates) {
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      }
+    }
+    const lngRange = maxLng - minLng || 0.001;
+    const latRange = maxLat - minLat || 0.001;
+    const width = 1000;
+    const height = 600;
+    const padding = 24;
+    return routes.map((route, index) => {
+      const points = route.geometry.coordinates;
+      const step = Math.max(1, Math.ceil(points.length / 200));
+      const sampled = points.filter(
+        (_, pointIndex) =>
+          pointIndex % step === 0 || pointIndex === points.length - 1
+      );
+      const d = sampled
+        .map(([lng, lat], pointIndex) => {
+          const x =
+            padding + ((lng - minLng) / lngRange) * (width - padding * 2);
+          const y =
+            padding + ((maxLat - lat) / latRange) * (height - padding * 2);
+          return `${pointIndex ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+        })
+        .join(' ');
+      return { id: index, d, type: route.properties.type };
+    });
+  }, [routes]);
+
   const fitRoutes = useCallback(() => {
     const map = mapRef.current;
     if (!map || routeBounds.isEmpty()) return;
@@ -309,7 +348,30 @@ export function RouteMapCanvas({
         </div>
       </div>
       <div className="route-map-body">
-        <div ref={containerRef} className="h-full w-full" />
+        {MAPBOX_TOKEN ? (
+          <div ref={containerRef} className="h-full w-full" />
+        ) : (
+          <svg
+            viewBox="0 0 1000 600"
+            className="h-full w-full bg-slate-100 dark:bg-slate-900"
+            role="region"
+            aria-label={zh ? '跑步路线地图' : 'Running route map'}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            {plainPaths.map((path) => (
+              <path
+                key={path.id}
+                d={path.d}
+                fill="none"
+                stroke={path.type === 'Run' ? '#f97316' : '#4dd2ff'}
+                strokeWidth={selectedActivity ? 3.5 : 1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={selectedActivity ? 1 : 0.58}
+              />
+            ))}
+          </svg>
+        )}
         {!routes.length && (
           <div className="route-map-empty" role="status">
             {zh
@@ -330,10 +392,10 @@ export function RouteMapCanvas({
               ? zh
                 ? '正在加载地图…'
                 : 'Loading map…'
-              : provider === 'carto'
+              : !MAPBOX_TOKEN
                 ? zh
-                  ? '备用底图 · CARTO'
-                  : 'Alternative basemap · CARTO'
+                  ? '轨迹总览 · 无需底图令牌'
+                  : 'Route overview · no basemap token'
                 : zh
                   ? '底图 · Mapbox'
                   : 'Basemap · Mapbox'}
