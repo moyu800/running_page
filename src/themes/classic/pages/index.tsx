@@ -85,7 +85,7 @@ const Index = () => {
   const { siteTitle, siteUrl } = getSiteMetadata();
   const { activities, thisYear } = useActivities();
   const themeChangeCounter = useThemeChangeCounter();
-  const [year, setYear] = useState(thisYear);
+  const [year, setYear] = useState('Total');
   const [runIndex, setRunIndex] = useState(-1);
   const [title, setTitle] = useState('');
   // Animation states for replacing intervalIdRef
@@ -95,7 +95,7 @@ const Index = () => {
   const [currentFilter, setCurrentFilter] = useState<{
     item: string;
     func: (_run: Activity, _value: string) => boolean;
-  }>({ item: thisYear, func: filterYearRuns });
+  }>({ item: 'Total', func: filterYearRuns });
 
   // Track if we're showing a single run from URL hash
   const singleRunId = useRunHashId();

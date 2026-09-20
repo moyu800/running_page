@@ -245,13 +245,13 @@ const titleForRun = (run: Activity): string => {
   if (runHour >= 0 && runHour <= 10) {
     return RUN_TITLES.MORNING_RUN_TITLE;
   }
-  if (runHour > 10 && runHour <= 14) {
+  if (runHour > 10 && runHour <= 13) {
     return RUN_TITLES.MIDDAY_RUN_TITLE;
   }
-  if (runHour > 14 && runHour <= 18) {
+  if (runHour > 13 && runHour <= 16) {
     return RUN_TITLES.AFTERNOON_RUN_TITLE;
   }
-  if (runHour > 18 && runHour <= 21) {
+  if (runHour > 16 && runHour <= 19) {
     return RUN_TITLES.EVENING_RUN_TITLE;
   }
   return RUN_TITLES.NIGHT_RUN_TITLE;
