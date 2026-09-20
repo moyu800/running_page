@@ -31,13 +31,13 @@ theme_preset: dashboard
 
 goals:
   all:
-    yearly: 2000
-    monthly: 150
+    yearly: 2399
+    monthly: 200
     weekly: 35
     unit: distance
 
   Run:
-    yearly: 2000
-    monthly: 150
+    yearly: 2399
+    monthly: 200
     weekly: 35
     unit: distance
