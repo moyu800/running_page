@@ -107,14 +107,23 @@ export function RouteMapCanvas({
     let maxLng = -Infinity;
     let minLat = Infinity;
     let maxLat = -Infinity;
+    const lngs: number[] = [];
+    const lats: number[] = [];
     for (const route of routes) {
       for (const [lng, lat] of route.geometry.coordinates) {
-        minLng = Math.min(minLng, lng);
-        maxLng = Math.max(maxLng, lng);
-        minLat = Math.min(minLat, lat);
-        maxLat = Math.max(maxLat, lat);
+        lngs.push(lng);
+        lats.push(lat);
       }
     }
+    lngs.sort((a, b) => a - b);
+    lats.sort((a, b) => a - b);
+    const trim = routes.length > 1 ? 0.005 : 0;
+    const low = Math.floor((lngs.length - 1) * trim);
+    const high = Math.ceil((lngs.length - 1) * (1 - trim));
+    minLng = lngs[low];
+    maxLng = lngs[high];
+    minLat = lats[low];
+    maxLat = lats[high];
     const lngRange = maxLng - minLng || 0.001;
     const latRange = maxLat - minLat || 0.001;
     const width = 1000;
@@ -384,18 +393,18 @@ export function RouteMapCanvas({
       </div>
       <div className="route-map-footer">
         <span role="status" aria-live="polite">
-          {status === 'error'
+          {!MAPBOX_TOKEN
             ? zh
-              ? '底图加载失败，请重试'
-              : 'Basemap failed to load'
-            : status === 'loading'
+              ? '轨迹总览 · 无需底图令牌'
+              : 'Route overview · no basemap token'
+            : status === 'error'
               ? zh
-                ? '正在加载地图…'
-                : 'Loading map…'
-              : !MAPBOX_TOKEN
+                ? '底图加载失败，请重试'
+                : 'Basemap failed to load'
+              : status === 'loading'
                 ? zh
-                  ? '轨迹总览 · 无需底图令牌'
-                  : 'Route overview · no basemap token'
+                  ? '正在加载地图…'
+                  : 'Loading map…'
                 : zh
                   ? '底图 · Mapbox'
                   : 'Basemap · Mapbox'}
