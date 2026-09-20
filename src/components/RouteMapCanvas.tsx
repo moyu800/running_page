@@ -212,8 +212,12 @@ export function RouteMapCanvas({
       if (!failed) setStatus('ready');
     };
     const onLoading = () => setStatus('loading');
+    const onStyleLoad = () => {
+      styleReadyRef.current = true;
+    };
     map.on('error', onError);
     map.on('idle', onIdle);
+    map.on('style.load', onStyleLoad);
     map.once('styledataloading', onLoading);
     styleReadyRef.current = false;
     map.setStyle(style, {
@@ -228,6 +232,7 @@ export function RouteMapCanvas({
       window.clearTimeout(timer);
       map.off('error', onError);
       map.off('idle', onIdle);
+      map.off('style.load', onStyleLoad);
       map.off('styledataloading', onLoading);
     };
   }, [style, provider, retry, zh]);
