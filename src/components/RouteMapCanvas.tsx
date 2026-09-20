@@ -117,7 +117,7 @@ export function RouteMapCanvas({
     }
     lngs.sort((a, b) => a - b);
     lats.sort((a, b) => a - b);
-    const trim = routes.length > 1 ? 0.005 : 0;
+    const trim = routes.length > 1 ? 0.01 : 0;
     const low = Math.floor((lngs.length - 1) * trim);
     const high = Math.ceil((lngs.length - 1) * (1 - trim));
     minLng = lngs[low];
