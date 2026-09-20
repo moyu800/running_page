@@ -90,7 +90,7 @@ export const ChinaMap = memo(function ChinaMap({
   const provinceCount = useMemo(() => {
     const map = new Map<string, number>();
     for (const a of activities) {
-      const p = extractProvince(a.location_country);
+      const p = extractProvince(a.location_country || a.name);
       if (p) map.set(p, (map.get(p) ?? 0) + 1);
     }
     return map;

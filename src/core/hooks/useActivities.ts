@@ -95,6 +95,37 @@ export function extractProvince(loc: string | null): string | null {
   for (const [key, val] of fuzzy) {
     if (loc.includes(key)) return val;
   }
+
+  // Garmin CN activities can have an empty location_country when reverse
+  // geocoding is disabled. Fall back to city names already present in the
+  // activity title so the footprint map still works without network lookups.
+  const cityProvince: [string, string][] = [
+    ['金华', '浙江省'],
+    ['杭州', '浙江省'],
+    ['嘉兴', '浙江省'],
+    ['宁波', '浙江省'],
+    ['丽水', '浙江省'],
+    ['长沙', '湖南省'],
+    ['张家界', '湖南省'],
+    ['湘西', '湖南省'],
+    ['阜阳', '安徽省'],
+    ['武汉', '湖北省'],
+    ['厦门', '福建省'],
+    ['银川', '宁夏回族自治区'],
+    ['西安', '陕西省'],
+    ['成都', '四川省'],
+    ['阿坝', '四川省'],
+    ['苏州', '江苏省'],
+    ['广州', '广东省'],
+    ['深圳', '广东省'],
+    ['西宁', '青海省'],
+    ['海西', '青海省'],
+    ['海北', '青海省'],
+    ['兰州', '甘肃省'],
+  ];
+  for (const [city, province] of cityProvince) {
+    if (loc.includes(city)) return province;
+  }
   return null;
 }
 

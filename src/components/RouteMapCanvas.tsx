@@ -37,15 +37,27 @@ export function RouteMapCanvas({
   const styleReadyRef = useRef(false);
   const cameraRef = useRef<mapboxgl.CameraOptions | null>(null);
   const fittedRef = useRef<unknown>(null);
-  const [provider, setProvider] = useState(MAPBOX_TOKEN ? 'mapbox' : 'carto');
+  const [provider, setProvider] = useState(MAPBOX_TOKEN ? 'mapbox' : 'plain');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
   const [retry, setRetry] = useState(0);
-  const style =
+  const style: mapboxgl.StyleSpecification =
     provider === 'mapbox'
       ? `mapbox://styles/mapbox/${dark === false ? 'light' : 'dark'}-v11`
-      : `https://basemaps.cartocdn.com/gl/${dark === false ? 'positron' : 'dark-matter'}-gl-style/style.json`;
+      : {
+          version: 8,
+          sources: {},
+          layers: [
+            {
+              id: 'background',
+              type: 'background',
+              paint: {
+                'background-color': dark === false ? '#f1f5f9' : '#111827',
+              },
+            },
+          ],
+        };
 
   const routes = useMemo(() => {
     const items = selectedActivity ? [selectedActivity] : activities;
@@ -190,7 +202,7 @@ export function RouteMapCanvas({
     const onError = (event: mapboxgl.ErrorEvent) => {
       const code = (event.error as Error & { status?: number }).status;
       if (provider === 'mapbox' && (code === 401 || code === 403)) {
-        setProvider('carto');
+        setProvider('plain');
       } else {
         failed = true;
         setStatus('error');
