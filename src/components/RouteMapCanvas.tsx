@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import * as polyline from '@mapbox/polyline';
 import type { Activity } from '../types';
-import { MAPBOX_TOKEN } from '../config';
 import { useLocale } from '../hooks/useLocale';
 import './RouteMap.css';
 
@@ -23,6 +22,63 @@ const routeCache = new WeakMap<
   }[]
 >();
 
+const PI = Math.PI;
+const AXIS = 6378245;
+const OFFSET = 0.006693421622965943;
+
+function outsideChina(lng: number, lat: number) {
+  return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+}
+
+function transformLat(lng: number, lat: number) {
+  let value =
+    -100 +
+    2 * lng +
+    3 * lat +
+    0.2 * lat * lat +
+    0.1 * lng * lat +
+    0.2 * Math.sqrt(Math.abs(lng));
+  value +=
+    ((20 * Math.sin(6 * lng * PI) + 20 * Math.sin(2 * lng * PI)) * 2) / 3;
+  value += ((20 * Math.sin(lat * PI) + 40 * Math.sin((lat / 3) * PI)) * 2) / 3;
+  return (
+    value +
+    ((160 * Math.sin((lat / 12) * PI) + 320 * Math.sin((lat * PI) / 30)) * 2) /
+      3
+  );
+}
+
+function transformLng(lng: number, lat: number) {
+  let value =
+    300 +
+    lng +
+    2 * lat +
+    0.1 * lng * lng +
+    0.1 * lng * lat +
+    0.1 * Math.sqrt(Math.abs(lng));
+  value +=
+    ((20 * Math.sin(6 * lng * PI) + 20 * Math.sin(2 * lng * PI)) * 2) / 3;
+  value += ((20 * Math.sin(lng * PI) + 40 * Math.sin((lng / 3) * PI)) * 2) / 3;
+  return (
+    value +
+    ((150 * Math.sin((lng / 12) * PI) + 300 * Math.sin((lng / 30) * PI)) * 2) /
+      3
+  );
+}
+
+function wgs84ToGcj02([lng, lat]: number[]) {
+  if (outsideChina(lng, lat)) return [lng, lat];
+  let dLat = transformLat(lng - 105, lat - 35);
+  let dLng = transformLng(lng - 105, lat - 35);
+  const radLat = (lat / 180) * PI;
+  let magic = Math.sin(radLat);
+  magic = 1 - OFFSET * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat * 180) / (((AXIS * (1 - OFFSET)) / (magic * sqrtMagic)) * PI);
+  dLng = (dLng * 180) / ((AXIS / sqrtMagic) * Math.cos(radLat) * PI);
+  return [lng + dLng, lat + dLat];
+}
+
 export function RouteMapCanvas({
   activities,
   selectedActivity,
@@ -33,31 +89,38 @@ export function RouteMapCanvas({
   const zh = locale === 'zh';
   const panelRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const styleReadyRef = useRef(false);
-  const cameraRef = useRef<mapboxgl.CameraOptions | null>(null);
+  const cameraRef = useRef<maplibregl.CameraOptions | null>(null);
   const fittedRef = useRef<unknown>(null);
-  const [provider, setProvider] = useState(MAPBOX_TOKEN ? 'mapbox' : 'plain');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
   const [retry, setRetry] = useState(0);
-  const style: mapboxgl.StyleSpecification =
-    provider === 'mapbox'
-      ? `mapbox://styles/mapbox/${dark === false ? 'light' : 'dark'}-v11`
-      : {
-          version: 8,
-          sources: {},
-          layers: [
-            {
-              id: 'background',
-              type: 'background',
-              paint: {
-                'background-color': dark === false ? '#f1f5f9' : '#111827',
-              },
-            },
+  const style = useMemo<maplibregl.StyleSpecification>(
+    () => ({
+      version: 8,
+      sources: {
+        amap: {
+          type: 'raster',
+          tiles: [
+            'https://webst01.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}',
           ],
-        };
+          tileSize: 256,
+          attribution: '© 高德地图',
+        },
+      },
+      layers: [
+        {
+          id: 'background',
+          type: 'background',
+          paint: { 'background-color': dark ? '#111827' : '#f1f5f9' },
+        },
+        { id: 'amap', type: 'raster', source: 'amap' },
+      ],
+    }),
+    [dark]
+  );
 
   const routes = useMemo(() => {
     const items = selectedActivity ? [selectedActivity] : activities;
@@ -66,7 +129,7 @@ export function RouteMapCanvas({
       if (cached) return cached;
       if (!activity.summary_polyline) return [];
       try {
-        const coordinates = polyline
+        let coordinates = polyline
           .decode(activity.summary_polyline)
           .map(([lat, lng]) => [lng, lat])
           .filter(
@@ -76,6 +139,7 @@ export function RouteMapCanvas({
               Math.abs(lng) <= 180 &&
               Math.abs(lat) <= 90
           );
+        coordinates = coordinates.map(wgs84ToGcj02);
         if (coordinates.length < 2) return [];
         const features = [
           {
@@ -93,7 +157,7 @@ export function RouteMapCanvas({
   }, [activities, selectedActivity]);
 
   const routeBounds = useMemo(() => {
-    const bounds = new mapboxgl.LngLatBounds();
+    const bounds = new maplibregl.LngLatBounds();
     for (const route of routes) {
       for (const coord of route.geometry.coordinates)
         bounds.extend(coord as [number, number]);
@@ -101,12 +165,8 @@ export function RouteMapCanvas({
     return bounds;
   }, [routes]);
 
-  const plainPaths = useMemo(() => {
-    if (MAPBOX_TOKEN || !routes.length) return [];
-    let minLng = Infinity;
-    let maxLng = -Infinity;
-    let minLat = Infinity;
-    let maxLat = -Infinity;
+  const focusedBounds = useMemo(() => {
+    if (selectedActivity || !routes.length) return routeBounds;
     const lngs: number[] = [];
     const lats: number[] = [];
     for (const route of routes) {
@@ -117,59 +177,47 @@ export function RouteMapCanvas({
     }
     lngs.sort((a, b) => a - b);
     lats.sort((a, b) => a - b);
-    const trim = routes.length > 1 ? 0.05 : 0;
+    const trim = 0.05;
     const low = Math.floor((lngs.length - 1) * trim);
     const high = Math.ceil((lngs.length - 1) * (1 - trim));
-    minLng = lngs[low];
-    maxLng = lngs[high];
-    minLat = lats[low];
-    maxLat = lats[high];
-    const lngRange = maxLng - minLng || 0.001;
-    const latRange = maxLat - minLat || 0.001;
-    const width = 1000;
-    const height = 600;
-    const padding = 24;
-    return routes.map((route, index) => {
-      const points = route.geometry.coordinates;
-      const step = Math.max(1, Math.ceil(points.length / 200));
-      const sampled = points.filter(
-        (_, pointIndex) =>
-          pointIndex % step === 0 || pointIndex === points.length - 1
-      );
-      const d = sampled
-        .map(([lng, lat], pointIndex) => {
-          const x =
-            padding + ((lng - minLng) / lngRange) * (width - padding * 2);
-          const y =
-            padding + ((maxLat - lat) / latRange) * (height - padding * 2);
-          return `${pointIndex ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-        })
-        .join(' ');
-      return { id: index, d, type: route.properties.type };
-    });
-  }, [routes]);
+    return new maplibregl.LngLatBounds(
+      [lngs[low], lats[low]],
+      [lngs[high], lats[high]]
+    );
+  }, [routes, routeBounds, selectedActivity]);
 
   const fitRoutes = useCallback(() => {
     const map = mapRef.current;
-    if (!map || routeBounds.isEmpty()) return;
-    map.fitBounds(routeBounds, {
+    if (!map || focusedBounds.isEmpty()) return;
+    map.fitBounds(focusedBounds, {
       padding: { top: 35, bottom: 35, left: 35, right: 65 },
       maxZoom: selectedActivity ? 16 : 13,
       duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches
         ? 0
         : 500,
     });
-  }, [routeBounds, selectedActivity]);
+  }, [focusedBounds, selectedActivity]);
 
   const drawRoutes = useCallback(() => {
     const map = mapRef.current;
     if (!map || !styleReadyRef.current) return;
     const data = { type: 'FeatureCollection' as const, features: routes };
     const source = map.getSource('routes') as
-      mapboxgl.GeoJSONSource | undefined;
+      maplibregl.GeoJSONSource | undefined;
     if (source) source.setData(data);
     else {
       map.addSource('routes', { type: 'geojson', data });
+      map.addLayer({
+        id: 'route-casing',
+        type: 'line',
+        source: 'routes',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': dark ? '#111827' : '#ffffff',
+          'line-width': selectedActivity ? 6 : 4,
+          'line-opacity': selectedActivity ? 0.9 : 0.65,
+        },
+      });
       map.addLayer({
         id: 'routes',
         type: 'line',
@@ -180,16 +228,21 @@ export function RouteMapCanvas({
             'match',
             ['get', 'type'],
             'Run',
-            '#f97316',
+            '#ef4444',
             'Ride',
-            '#3b82f6',
-            '#4dd2ff',
+            '#2563eb',
+            '#9333ea',
           ],
         },
       });
     }
+    map.setPaintProperty(
+      'route-casing',
+      'line-width',
+      selectedActivity ? 6 : 4
+    );
     map.setPaintProperty('routes', 'line-width', selectedActivity ? 3.5 : 2);
-    map.setPaintProperty('routes', 'line-opacity', selectedActivity ? 1 : 0.7);
+    map.setPaintProperty('routes', 'line-opacity', selectedActivity ? 1 : 0.82);
     if (fittedRef.current !== routes) {
       fittedRef.current = routes;
       fitRoutes();
@@ -198,10 +251,8 @@ export function RouteMapCanvas({
 
   useEffect(() => {
     if (!containerRef.current || !panelRef.current) return;
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       container: containerRef.current,
-      accessToken: MAPBOX_TOKEN,
-      language: zh ? 'zh-Hans' : 'en',
       style: { version: 8, sources: {}, layers: [] },
       center: [121.4, 31.2],
       zoom: 10,
@@ -219,13 +270,13 @@ export function RouteMapCanvas({
         : {},
     });
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(
-      new mapboxgl.FullscreenControl({ container: panelRef.current }),
+      new maplibregl.FullscreenControl({ container: panelRef.current }),
       'top-right'
     );
     map.addControl(
-      new mapboxgl.ScaleControl({ unit: 'metric', maxWidth: 90 }),
+      new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 90 }),
       'bottom-left'
     );
     const observer = new ResizeObserver(() => map.resize());
@@ -247,14 +298,9 @@ export function RouteMapCanvas({
     const map = mapRef.current;
     if (!map) return;
     let failed = false;
-    const onError = (event: mapboxgl.ErrorEvent) => {
-      const code = (event.error as Error & { status?: number }).status;
-      if (provider === 'mapbox' && (code === 401 || code === 403)) {
-        setProvider('plain');
-      } else {
-        failed = true;
-        setStatus('error');
-      }
+    const onError = (event: maplibregl.ErrorEvent) => {
+      failed = true;
+      setStatus('error');
     };
     const onIdle = () => {
       if (!failed) setStatus('ready');
@@ -283,7 +329,7 @@ export function RouteMapCanvas({
       map.off('style.load', onStyleLoad);
       map.off('styledataloading', onLoading);
     };
-  }, [style, provider, retry, zh]);
+  }, [style, retry, zh]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -350,37 +396,19 @@ export function RouteMapCanvas({
             className="route-map-action"
             disabled={!routes.length}
             onClick={fitRoutes}
-            title={zh ? '将所有当前轨迹完整放入视野' : 'Fit all current routes'}
+            title={zh ? '定位主要轨迹区域' : 'Fit the main route area'}
           >
             {zh ? '定位轨迹' : 'Fit routes'}
           </button>
         </div>
       </div>
       <div className="route-map-body">
-        {MAPBOX_TOKEN ? (
-          <div ref={containerRef} className="h-full w-full" />
-        ) : (
-          <svg
-            viewBox="0 0 1000 600"
-            className="h-full w-full bg-slate-100 dark:bg-slate-900"
-            role="region"
-            aria-label={zh ? '跑步路线地图' : 'Running route map'}
-            preserveAspectRatio="xMidYMid meet"
-          >
-            {plainPaths.map((path) => (
-              <path
-                key={path.id}
-                d={path.d}
-                fill="none"
-                stroke={path.type === 'Run' ? '#f97316' : '#4dd2ff'}
-                strokeWidth={selectedActivity ? 3.5 : 1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={selectedActivity ? 1 : 0.58}
-              />
-            ))}
-          </svg>
-        )}
+        <div
+          ref={containerRef}
+          className="h-full w-full"
+          role="region"
+          aria-label={zh ? '跑步路线地图' : 'Running route map'}
+        />
         {!routes.length && (
           <div className="route-map-empty" role="status">
             {zh
@@ -393,37 +421,26 @@ export function RouteMapCanvas({
       </div>
       <div className="route-map-footer">
         <span role="status" aria-live="polite">
-          {!MAPBOX_TOKEN
+          {status === 'error'
             ? zh
-              ? '轨迹总览 · 无需底图令牌'
-              : 'Route overview · no basemap token'
-            : status === 'error'
+              ? '底图加载失败，请重试'
+              : 'Basemap failed to load'
+            : status === 'loading'
               ? zh
-                ? '底图加载失败，请重试'
-                : 'Basemap failed to load'
-              : status === 'loading'
-                ? zh
-                  ? '正在加载地图…'
-                  : 'Loading map…'
-                : zh
-                  ? '底图 · Mapbox'
-                  : 'Basemap · Mapbox'}
+                ? '正在加载地图…'
+                : 'Loading map…'
+              : zh
+                ? '底图 · 高德地图'
+                : 'Basemap · Amap'}
         </span>
-        {(status === 'error' || (provider === 'carto' && !!MAPBOX_TOKEN)) && (
+        {status === 'error' && (
           <button
             className="route-map-action"
             onClick={() => {
-              setProvider(MAPBOX_TOKEN ? 'mapbox' : 'carto');
               setRetry((value) => value + 1);
             }}
           >
-            {provider === 'carto' && MAPBOX_TOKEN
-              ? zh
-                ? '重试 Mapbox'
-                : 'Retry Mapbox'
-              : zh
-                ? '重试'
-                : 'Retry'}
+            {zh ? '重试' : 'Retry'}
           </button>
         )}
       </div>
