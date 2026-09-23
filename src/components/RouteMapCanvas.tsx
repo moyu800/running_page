@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as polyline from '@mapbox/polyline';
 import type { Activity } from '../types';
+import { MAPBOX_TOKEN } from '../config';
 import { useLocale } from '../hooks/useLocale';
 import './RouteMap.css';
 
@@ -22,63 +23,6 @@ const routeCache = new WeakMap<
   }[]
 >();
 
-const PI = Math.PI;
-const AXIS = 6378245;
-const OFFSET = 0.006693421622965943;
-
-function outsideChina(lng: number, lat: number) {
-  return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
-}
-
-function transformLat(lng: number, lat: number) {
-  let value =
-    -100 +
-    2 * lng +
-    3 * lat +
-    0.2 * lat * lat +
-    0.1 * lng * lat +
-    0.2 * Math.sqrt(Math.abs(lng));
-  value +=
-    ((20 * Math.sin(6 * lng * PI) + 20 * Math.sin(2 * lng * PI)) * 2) / 3;
-  value += ((20 * Math.sin(lat * PI) + 40 * Math.sin((lat / 3) * PI)) * 2) / 3;
-  return (
-    value +
-    ((160 * Math.sin((lat / 12) * PI) + 320 * Math.sin((lat * PI) / 30)) * 2) /
-      3
-  );
-}
-
-function transformLng(lng: number, lat: number) {
-  let value =
-    300 +
-    lng +
-    2 * lat +
-    0.1 * lng * lng +
-    0.1 * lng * lat +
-    0.1 * Math.sqrt(Math.abs(lng));
-  value +=
-    ((20 * Math.sin(6 * lng * PI) + 20 * Math.sin(2 * lng * PI)) * 2) / 3;
-  value += ((20 * Math.sin(lng * PI) + 40 * Math.sin((lng / 3) * PI)) * 2) / 3;
-  return (
-    value +
-    ((150 * Math.sin((lng / 12) * PI) + 300 * Math.sin((lng / 30) * PI)) * 2) /
-      3
-  );
-}
-
-function wgs84ToGcj02([lng, lat]: number[]) {
-  if (outsideChina(lng, lat)) return [lng, lat];
-  let dLat = transformLat(lng - 105, lat - 35);
-  let dLng = transformLng(lng - 105, lat - 35);
-  const radLat = (lat / 180) * PI;
-  let magic = Math.sin(radLat);
-  magic = 1 - OFFSET * magic * magic;
-  const sqrtMagic = Math.sqrt(magic);
-  dLat = (dLat * 180) / (((AXIS * (1 - OFFSET)) / (magic * sqrtMagic)) * PI);
-  dLng = (dLng * 180) / ((AXIS / sqrtMagic) * Math.cos(radLat) * PI);
-  return [lng + dLng, lat + dLat];
-}
-
 export function RouteMapCanvas({
   activities,
   selectedActivity,
@@ -93,33 +37,17 @@ export function RouteMapCanvas({
   const styleReadyRef = useRef(false);
   const cameraRef = useRef<maplibregl.CameraOptions | null>(null);
   const fittedRef = useRef<unknown>(null);
+  const [provider, setProvider] = useState(MAPBOX_TOKEN ? 'mapbox' : 'carto');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
   const [retry, setRetry] = useState(0);
-  const style = useMemo<maplibregl.StyleSpecification>(
-    () => ({
-      version: 8,
-      sources: {
-        amap: {
-          type: 'raster',
-          tiles: [
-            'https://webst01.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}',
-          ],
-          tileSize: 256,
-          attribution: '© 高德地图',
-        },
-      },
-      layers: [
-        {
-          id: 'background',
-          type: 'background',
-          paint: { 'background-color': dark ? '#111827' : '#f1f5f9' },
-        },
-        { id: 'amap', type: 'raster', source: 'amap' },
-      ],
-    }),
-    [dark]
+  const style = useMemo<maplibregl.StyleSpecification | string>(
+    () =>
+      provider === 'mapbox'
+        ? `https://api.mapbox.com/styles/v1/mapbox/${dark === false ? 'light' : 'dark'}-v11?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
+        : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    [dark, provider]
   );
 
   const routes = useMemo(() => {
@@ -139,7 +67,6 @@ export function RouteMapCanvas({
               Math.abs(lng) <= 180 &&
               Math.abs(lat) <= 90
           );
-        coordinates = coordinates.map(wgs84ToGcj02);
         if (coordinates.length < 2) return [];
         const features = [
           {
@@ -282,8 +209,14 @@ export function RouteMapCanvas({
     if (!map) return;
     let failed = false;
     const onError = (event: maplibregl.ErrorEvent) => {
-      failed = true;
-      setStatus('error');
+      const code = (event.error as Error & { status?: number }).status;
+      if (provider === 'mapbox' && (code === 401 || code === 403)) {
+        setProvider('carto');
+        setStatus('loading');
+      } else {
+        failed = true;
+        setStatus('error');
+      }
     };
     const onIdle = () => {
       if (!failed) setStatus('ready');
@@ -412,18 +345,29 @@ export function RouteMapCanvas({
               ? zh
                 ? '正在加载地图…'
                 : 'Loading map…'
-              : zh
-                ? '底图 · 高德地图'
-                : 'Basemap · Amap'}
+              : provider === 'mapbox'
+                ? zh
+                  ? '底图 · Mapbox'
+                  : 'Basemap · Mapbox'
+                : zh
+                  ? '备用底图 · CARTO'
+                  : 'Alternative basemap · CARTO'}
         </span>
         {status === 'error' && (
           <button
             className="route-map-action"
             onClick={() => {
+              setProvider(MAPBOX_TOKEN ? 'mapbox' : 'carto');
               setRetry((value) => value + 1);
             }}
           >
-            {zh ? '重试' : 'Retry'}
+            {provider === 'carto' && MAPBOX_TOKEN
+              ? zh
+                ? '重试 Mapbox'
+                : 'Retry Mapbox'
+              : zh
+                ? '重试'
+                : 'Retry'}
           </button>
         )}
       </div>
