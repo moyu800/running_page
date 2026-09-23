@@ -208,9 +208,11 @@ export function RouteMapCanvas({
     const map = mapRef.current;
     if (!map) return;
     let failed = false;
-    const onError = (event: maplibregl.ErrorEvent) => {
-      const code = (event.error as Error & { status?: number }).status;
-      if (provider === 'mapbox' && (code === 401 || code === 403)) {
+    const onError = (_event: maplibregl.ErrorEvent) => {
+      // MapLibre does not consistently expose HTTP status codes for style and
+      // tile failures. Any Mapbox loading error should therefore fall back to
+      // CARTO instead of leaving the map blank.
+      if (provider === 'mapbox') {
         setProvider('carto');
         setStatus('loading');
       } else {
