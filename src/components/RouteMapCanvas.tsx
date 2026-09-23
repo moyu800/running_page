@@ -166,24 +166,7 @@ export function RouteMapCanvas({
   }, [routes]);
 
   const focusedBounds = useMemo(() => {
-    if (selectedActivity || !routes.length) return routeBounds;
-    const lngs: number[] = [];
-    const lats: number[] = [];
-    for (const route of routes) {
-      for (const [lng, lat] of route.geometry.coordinates) {
-        lngs.push(lng);
-        lats.push(lat);
-      }
-    }
-    lngs.sort((a, b) => a - b);
-    lats.sort((a, b) => a - b);
-    const trim = 0.05;
-    const low = Math.floor((lngs.length - 1) * trim);
-    const high = Math.ceil((lngs.length - 1) * (1 - trim));
-    return new maplibregl.LngLatBounds(
-      [lngs[low], lats[low]],
-      [lngs[high], lats[high]]
-    );
+    return routeBounds;
   }, [routes, routeBounds, selectedActivity]);
 
   const fitRoutes = useCallback(() => {
@@ -228,10 +211,10 @@ export function RouteMapCanvas({
             'match',
             ['get', 'type'],
             'Run',
-            '#ef4444',
+            '#e89b68',
             'Ride',
-            '#2563eb',
-            '#9333ea',
+            '#86b7d9',
+            '#e89b68',
           ],
         },
       });
@@ -239,9 +222,9 @@ export function RouteMapCanvas({
     map.setPaintProperty(
       'route-casing',
       'line-width',
-      selectedActivity ? 6 : 4
+      selectedActivity ? 4 : 3
     );
-    map.setPaintProperty('routes', 'line-width', selectedActivity ? 3.5 : 2);
+    map.setPaintProperty('routes', 'line-width', selectedActivity ? 2.5 : 1.5);
     map.setPaintProperty('routes', 'line-opacity', selectedActivity ? 1 : 0.82);
     if (fittedRef.current !== routes) {
       fittedRef.current = routes;
